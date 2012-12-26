@@ -40,7 +40,7 @@ func (s PgStmt) Exec(args []driver.Value) (driver.Result, error) {
 }
 
 func (s PgStmt) Query(args []driver.Value) (driver.Rows, error) {
-	return PgRows{}, errors.New("pger: Query not implemented")
+	return query(s, args)
 }
 
 // Implementation of the Result interface
@@ -55,19 +55,17 @@ func (r PgResult) RowsAffected() (int64, error) {
 
 // Implementation of the Rows interface
 
-func (r PgRows) Columns() []string {
-	// TODO
-	return []string{}
+func (r *PgRows) Columns() []string {
+	return columns(r)
 }
 
-func (r PgRows) Close() error {
-	// TODO
+func (r *PgRows) Close() error {
+	pqclear(r.result)
 	return nil
 }
 
-func (r PgRows) Next(dest []driver.Value) error {
-	// TODO
-	return nil
+func (r *PgRows) Next(dest []driver.Value) error {
+	return next(r, dest)
 }
 
 // Implementation of the Driver interface

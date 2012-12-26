@@ -9,8 +9,10 @@ package driver
 */
 import "C"
 
+import "database/sql/driver"
 import "errors"
 import "fmt"
+import "io"
 import "unsafe"
 
 type PgConn struct {
@@ -39,11 +41,9 @@ type PgResult struct {
 }
 
 type PgStmt struct {
-	name string
+	name   string
 	result *C.PGresult
-}
-
-type PgRows struct {
+	conn   *PgConn
 }
 
 func prepare(conn *PgConn, query string) (*PgStmt, error) {
@@ -58,8 +58,73 @@ func prepare(conn *PgConn, query string) (*PgStmt, error) {
 		return &PgStmt{}, err
 	}
 
-	stmt := PgStmt{result: res, name: ""}
+	stmt := PgStmt{conn: conn, result: res, name: ""}
 	return &stmt, nil
+}
+
+type PgRows struct {
+	result *C.PGresult
+	cur    int
+}
+
+func query(stmt PgStmt, values []driver.Value) (*PgRows, error) {
+	conn := stmt.conn
+	params, err := AdaptValues(values, conn)
+	if err != nil {
+		return nil, err
+	}
+
+	name := C.CString(stmt.name)
+	defer C.free(unsafe.Pointer(name))
+
+	cparams := charpp(params)
+	defer charppFree(cparams, len(params))
+
+	// TODO: binary params
+	// TODO: binary results
+	res := C.PQexecPrepared(conn.conn, name, C.int(len(params)),
+		cparams, nil, nil, C.int(0))
+	if err := errorFromPGresult(res); err != nil {
+		pqclear(res)
+		return &PgRows{}, err
+	}
+
+	rows := PgRows{result: res}
+	return &rows, nil
+}
+
+func columns(r *PgRows) []string {
+	nfields := int(C.PQnfields(r.result))
+	rv := make([]string, nfields)
+	for i := 0; i < nfields; i++ {
+		rv[i] = C.GoString(C.PQfname(r.result, C.int(i)))
+	}
+	return rv
+}
+
+func next(r *PgRows, dest []driver.Value) error {
+	if r.cur >= int(C.PQntuples(r.result)) {
+		return io.EOF
+	}
+
+	// TODO: cache oids
+	// TODO: extendibility
+	for i := 0; i < len(dest); i++ {
+		if 0 == int(C.PQgetisnull(r.result, C.int(r.cur), C.int(i))) {
+			oid := int(C.PQftype(r.result, C.int(i)))
+			data := C.PQgetvalue(r.result, C.int(r.cur), C.int(i))
+			length := C.PQgetlength(r.result, C.int(r.cur), C.int(i))
+			var err error
+			dest[i], err = typecast(oid, data, length, r)
+			if err != nil {
+				return err
+			}
+		} else {
+			dest[i] = nil
+		}
+	}
+	r.cur++
+	return nil
 }
 
 func errorFromPGresult(res *C.PGresult) error {

@@ -19,7 +19,7 @@ func TestConnect(t *testing.T) {
 		return
 	}
 
-	rows, err := cnn.Query("select 42")
+	rows, err := cnn.Query("select 42::int8")
 	if err != nil {
 		t.Errorf("query failed: %v", err)
 		return
