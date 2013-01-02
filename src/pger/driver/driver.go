@@ -1,8 +1,11 @@
 package driver
 
-import "database/sql"
-import "database/sql/driver"
-import "errors"
+import (
+	"database/sql"
+	"database/sql/driver"
+	"errors"
+	"strconv"
+)
 
 func init() {
 	d := new(PgDriver)
@@ -36,7 +39,7 @@ func (s PgStmt) NumInput() int {
 }
 
 func (s PgStmt) Exec(args []driver.Value) (driver.Result, error) {
-	return PgResult{}, errors.New("pger: Exec not implemented")
+	return exec(s, args)
 }
 
 func (s PgStmt) Query(args []driver.Value) (driver.Rows, error) {
@@ -46,11 +49,17 @@ func (s PgStmt) Query(args []driver.Value) (driver.Rows, error) {
 // Implementation of the Result interface
 
 func (r PgResult) LastInsertId() (int64, error) {
-	return 0, nil
+	if r.lastoid == 0 {
+		return 0, errors.New("command returned no last insert id")
+	}
+	return int64(r.lastoid), nil
 }
 
 func (r PgResult) RowsAffected() (int64, error) {
-	return 1, nil
+	if r.tuples == "" {
+		return 0, errors.New("command returned no rows affected number")
+	}
+	return strconv.ParseInt(r.tuples, 10, 64)
 }
 
 // Implementation of the Rows interface

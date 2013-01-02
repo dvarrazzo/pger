@@ -9,11 +9,13 @@ package driver
 */
 import "C"
 
-import "database/sql/driver"
-import "errors"
-import "fmt"
-import "io"
-import "unsafe"
+import (
+	"database/sql/driver"
+	"errors"
+	"fmt"
+	"io"
+	"unsafe"
+)
 
 type PgConn struct {
 	conninfo string
@@ -38,6 +40,8 @@ func connect(conninfo string) (*PgConn, error) {
 }
 
 type PgResult struct {
+	tuples  string
+	lastoid uint
 }
 
 type PgStmt struct {
@@ -68,6 +72,30 @@ type PgRows struct {
 }
 
 func query(stmt PgStmt, values []driver.Value) (*PgRows, error) {
+	res, err := exec_prepared(stmt, values)
+	if err != nil {
+		return &PgRows{}, err
+	}
+
+	rows := PgRows{result: res}
+	return &rows, nil
+}
+
+func exec(stmt PgStmt, values []driver.Value) (*PgResult, error) {
+	res, err := exec_prepared(stmt, values)
+	if err != nil {
+		return &PgResult{}, err
+	}
+	defer pqclear(res)
+
+	tuples := C.GoString(C.PQcmdTuples(res))
+	lastoid := uint(C.PQoidValue(res))
+
+	rv := PgResult{tuples: tuples, lastoid: lastoid}
+	return &rv, nil
+}
+
+func exec_prepared(stmt PgStmt, values []driver.Value) (*C.PGresult, error) {
 	conn := stmt.conn
 	params, err := AdaptValues(values, conn)
 	if err != nil {
@@ -86,11 +114,10 @@ func query(stmt PgStmt, values []driver.Value) (*PgRows, error) {
 		cparams, nil, nil, C.int(0))
 	if err := errorFromPGresult(res); err != nil {
 		pqclear(res)
-		return &PgRows{}, err
+		return nil, err
 	}
 
-	rows := PgRows{result: res}
-	return &rows, nil
+	return res, nil
 }
 
 func columns(r *PgRows) []string {
