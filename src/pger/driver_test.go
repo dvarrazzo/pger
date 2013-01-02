@@ -38,6 +38,7 @@ func TestQuery(t *testing.T) {
 		t.Fatal("bad column names:", cols)
 	}
 
+	nrows := 0
 	for rows.Next() {
 		var n1 int
 		var n2 sql.NullInt64
@@ -51,6 +52,11 @@ func TestQuery(t *testing.T) {
 		if n2.Valid {
 			t.Fatal("scan failed: n2 =", n2.Int64)
 		}
+		nrows++
+	}
+
+	if nrows != 1 {
+		t.Fatal("bad rows number:", nrows)
 	}
 }
 
