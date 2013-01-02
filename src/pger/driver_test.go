@@ -21,7 +21,8 @@ func TestQuery(t *testing.T) {
 	}
 	defer cnn.Close()
 
-	rows, err := cnn.Query("select 42::int8 as foo, null::int8 as bar")
+	rows, err := cnn.Query(
+		"select $1::int8 as foo, $2::int8 as bar", 42, nil)
 	if err != nil {
 		t.Fatal("query failed:", err)
 	}
@@ -73,7 +74,7 @@ func TestExec(t *testing.T) {
 	}
 
 	res, err = cnn.Exec(`
-		create table if not exists test_exec (
+		create table test_exec (
 			id serial primary key, data text) with oids`)
 	if err != nil {
 		t.Fatal("create table failed:", err)

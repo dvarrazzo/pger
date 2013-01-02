@@ -113,6 +113,11 @@ func exec_prepared(stmt PgStmt, values []driver.Value) (*C.PGresult, error) {
 
 	cparams := charpp(params)
 	defer charppFree(cparams, len(params))
+	for i := 0; i < len(params); i++ {
+		if params[i] != nil {
+			charppSet(cparams, i, params[i])
+		}
+	}
 
 	// TODO: binary params
 	// TODO: binary results

@@ -23,6 +23,13 @@ charpp_free(char **args, int size) {
 	free(args);
 }
 
+static void
+charpp_set(char **args, int i, char *val)
+{
+	if (args[i])
+		free(args[i]);
+	args[i] = val;
+}
 */
 import "C"
 
@@ -33,4 +40,9 @@ func charpp(args [][]byte) **C.char {
 
 func charppFree(args **C.char, n int) {
 	C.charpp_free(args, C.int(n))
+}
+
+func charppSet(args **C.char, i int, val []byte) {
+	// TODO: looks like adapt should return string, not []byte
+	C.charpp_set(args, C.int(i), C.CString(string(val)))
 }
