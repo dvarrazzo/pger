@@ -33,6 +33,22 @@ func connect(conninfo string) (*PgConn, error) {
 		return nil, err
 	}
 
+	// TODO: support other encodings?
+	pname := C.CString("client_encoding")
+	defer C.free(unsafe.Pointer(pname))
+	cenc := C.PQparameterStatus(conn, pname)
+	if cenc == nil {
+		err := errors.New("connection failed: no client encoding")
+		C.PQfinish(conn)
+		return nil, err
+	}
+	if enc := C.GoString(cenc); enc != "UTF8" {
+		err := fmt.Errorf(
+			"connection failed: client encoding not supported: %s", enc)
+		C.PQfinish(conn)
+		return nil, err
+	}
+
 	// one-line error message
 	C.PQsetErrorVerbosity(conn, C.PQERRORS_TERSE)
 
@@ -113,11 +129,6 @@ func exec_prepared(stmt PgStmt, values []driver.Value) (*C.PGresult, error) {
 
 	cparams := charpp(params)
 	defer charppFree(cparams, len(params))
-	for i := 0; i < len(params); i++ {
-		if params[i] != nil {
-			charppSet(cparams, i, params[i])
-		}
-	}
 
 	// TODO: binary params
 	// TODO: binary results

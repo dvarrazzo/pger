@@ -88,7 +88,7 @@ func TestExec(t *testing.T) {
 		t.Fatal("no error after RowsAffected on create table")
 	}
 
-	res, err = cnn.Exec("insert into test_exec (data) values ('hello')")
+	res, err = cnn.Exec("insert into test_exec (data) values ($1)", "hello")
 	if err != nil {
 		t.Fatal("exec failed:", err)
 	}
@@ -105,5 +105,43 @@ func TestExec(t *testing.T) {
 	}
 	if n != 1 {
 		t.Fatal("bad rows affected after single insert:", n)
+	}
+}
+
+func TestEnc(t *testing.T) {
+	cnn, err := sql.Open("postgresql", conninfo)
+	if err != nil {
+		t.Fatal("connection failed:", err)
+	}
+	defer cnn.Close()
+
+	if _, err := cnn.Exec("drop table if exists test_enc"); err != nil {
+		t.Fatal("drop table failed:", err)
+	}
+	if _, err := cnn.Exec(`
+		create table test_enc (
+			id serial primary key, data text)`); err != nil {
+		t.Fatal("create table failed:", err)
+	}
+	// right arg encoding
+	if _, err := cnn.Exec(
+		"insert into test_enc (data) values ($1)", "€"); err != nil {
+		t.Fatal("insert 1 failed:", err)
+	}
+	// right query encoding
+	if _, err := cnn.Exec(
+		"insert into test_enc (data) values ('☃')"); err != nil {
+		t.Fatal("insert 2 failed:", err)
+	}
+
+	for id, v := range map[int]string{1: "€", 2: "☃"} {
+		row := cnn.QueryRow("select data from test_enc where id = $1", id)
+		var s string
+		if err := row.Scan(&s); err != nil {
+			t.Fatal("Scan failed:", err)
+		}
+		if s != v {
+			t.Fatal("bad queried value for id", id, ":", s, "instead of", v)
+		}
 	}
 }

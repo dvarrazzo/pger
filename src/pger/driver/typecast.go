@@ -4,7 +4,9 @@ import "C"
 
 import "strconv"
 
-var castmap = map[int]func(*C.char, C.int, *PgRows) (interface{}, error){
+type castfunc func(*C.char, C.int, *PgRows) (interface{}, error)
+
+var castmap = map[int]castfunc{
 	20: castInt,
 	// TODO: default
 	// TODO: all supported type
@@ -14,14 +16,14 @@ var castmap = map[int]func(*C.char, C.int, *PgRows) (interface{}, error){
 func typecast(oid int, data *C.char, length C.int, rows *PgRows) (interface{}, error) {
 	f, ok := castmap[oid]
 	if !ok {
-		f = castBytes
+		f = castString
 	}
 	return f(data, length, rows)
 }
 
-func castBytes(data *C.char, length C.int, rows *PgRows) (interface{}, error) {
+func castString(data *C.char, length C.int, rows *PgRows) (interface{}, error) {
 	s := C.GoStringN(data, length)
-	return []byte(s), nil
+	return s, nil
 }
 
 func castInt(data *C.char, length C.int, rows *PgRows) (interface{}, error) {
