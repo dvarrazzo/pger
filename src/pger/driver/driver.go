@@ -19,7 +19,7 @@ func (c *PgConn) Begin() (driver.Tx, error) {
 }
 
 func (c *PgConn) Close() error {
-	return errors.New("pger: Close not implemented")
+	return close_conn(c)
 }
 
 func (c *PgConn) Prepare(query string) (driver.Stmt, error) {

@@ -39,6 +39,12 @@ func connect(conninfo string) (*PgConn, error) {
 	return &PgConn{conn: conn, conninfo: conninfo}, nil
 }
 
+func close_conn(conn *PgConn) error {
+	C.PQfinish(conn.conn)
+	conn.conn = nil
+	return nil
+}
+
 type PgResult struct {
 	tuples  string
 	lastoid uint
