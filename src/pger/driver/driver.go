@@ -15,7 +15,11 @@ func init() {
 // Implementation of the Conn interface
 
 func (c *PgConn) Begin() (driver.Tx, error) {
-	return nil, errors.New("pger: Begin not implemented")
+	err := exec_string(c, "begin")
+	if err != nil {
+		return PgTx{}, err
+	}
+	return PgTx{conn: c}, nil
 }
 
 func (c *PgConn) Close() error {
@@ -44,6 +48,16 @@ func (s PgStmt) Exec(args []driver.Value) (driver.Result, error) {
 
 func (s PgStmt) Query(args []driver.Value) (driver.Rows, error) {
 	return query(s, args)
+}
+
+// Implementation of the Tx interface
+
+func (t PgTx) Commit() error {
+	return exec_string(t.conn, "commit")
+}
+
+func (t PgTx) Rollback() error {
+	return exec_string(t.conn, "rollback")
 }
 
 // Implementation of the Result interface

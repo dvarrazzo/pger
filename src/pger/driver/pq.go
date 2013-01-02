@@ -72,6 +72,10 @@ type PgStmt struct {
 	conn   *PgConn
 }
 
+type PgTx struct {
+	conn *PgConn
+}
+
 func prepare(conn *PgConn, query string) (*PgStmt, error) {
 	name := C.CString("")
 	defer C.free(unsafe.Pointer(name))
@@ -140,6 +144,22 @@ func exec_prepared(stmt PgStmt, values []driver.Value) (*C.PGresult, error) {
 	}
 
 	return res, nil
+}
+
+// Execute a single command in a string without parameters.
+// Return the error if any, else nil. Result is discarded.
+func exec_string(conn *PgConn, stmt string) error {
+	cstmt := C.CString(stmt)
+	defer C.free(unsafe.Pointer(cstmt))
+
+	res := C.PQexec(conn.conn, cstmt)
+	if err := errorFromPGresult(res); err != nil {
+		pqclear(res)
+		return err
+	}
+
+	pqclear(res)
+	return nil
 }
 
 func columns(r *PgRows) []string {

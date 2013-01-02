@@ -145,3 +145,62 @@ func TestEnc(t *testing.T) {
 		}
 	}
 }
+
+func TestTx(t *testing.T) {
+	cnn, err := sql.Open("postgresql", conninfo)
+	if err != nil {
+		t.Fatal("connection failed:", err)
+	}
+	defer cnn.Close()
+
+	if _, err := cnn.Exec("drop table if exists test_tx"); err != nil {
+		t.Fatal("drop table failed:", err)
+	}
+	if _, err := cnn.Exec(`
+		create table if not exists test_tx (
+			id serial primary key, data text)`); err != nil {
+		t.Fatal("create table failed:", err)
+	}
+
+	tx, err := cnn.Begin()
+	if err != nil {
+		t.Fatal("begin 1 failed:", err)
+	}
+	if _, err := tx.Exec(
+		"insert into test_tx (data) values ($1)", "foo"); err != nil {
+		t.Fatal("insert 1 failed:", err)
+	}
+	if err = tx.Rollback(); err != nil {
+		t.Fatal("rollback failed:", err)
+	}
+
+	tx, err = cnn.Begin()
+	if err != nil {
+		t.Fatal("begin 2 failed:", err)
+	}
+	if _, err := tx.Exec(
+		"insert into test_tx (data) values ($1)", "bar"); err != nil {
+		t.Fatal("insert 2 failed:", err)
+	}
+	if err = tx.Commit(); err != nil {
+		t.Fatal("commit failed:", err)
+	}
+
+	row := cnn.QueryRow("select count(*) from test_tx")
+	var n int
+	if err := row.Scan(&n); err != nil {
+		t.Fatal("Scan 1 failed:", err)
+	}
+	if n != 1 {
+		t.Fatal("expected 1 record; found:", n)
+	}
+
+	row = cnn.QueryRow("select data from test_tx where id = 2")
+	var s string
+	if err := row.Scan(&s); err != nil {
+		t.Fatal("Scan 2 failed:", err)
+	}
+	if s != "bar" {
+		t.Fatal("expected 'bar' record; found:", s)
+	}
+}
