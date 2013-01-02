@@ -21,20 +21,35 @@ func TestQuery(t *testing.T) {
 	}
 	defer cnn.Close()
 
-	rows, err := cnn.Query("select 42::int8")
+	rows, err := cnn.Query("select 42::int8 as foo, null::int8 as bar")
 	if err != nil {
 		t.Fatal("query failed:", err)
 	}
 	defer rows.Close()
 
+	cols, err := rows.Columns()
+	if err != nil {
+		t.Fatal("rows.Columns() failed:", err)
+	}
+	if len(cols) != 2 {
+		t.Fatal("bad number of columns:", len(cols))
+	}
+	if cols[0] != "foo" || cols[1] != "bar" {
+		t.Fatal("bad column names:", cols)
+	}
+
 	for rows.Next() {
-		var n int
-		err = rows.Scan(&n)
+		var n1 int
+		var n2 sql.NullInt64
+		err = rows.Scan(&n1, &n2)
 		if err != nil {
 			t.Fatal("scan failed:", err)
 		}
-		if n != 42 {
-			t.Fatal("scan failed:", n)
+		if n1 != 42 {
+			t.Fatal("scan failed: n1 =", n1)
+		}
+		if n2.Valid {
+			t.Fatal("scan failed: n2 =", n2.Int64)
 		}
 	}
 }
